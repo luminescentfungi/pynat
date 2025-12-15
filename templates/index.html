@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="hamburger" onclick="toggleSidebar()">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+        <div class="logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        </div>
+    </div>
+    {% include 'sidebar.html' %}
+    <div class="content">
+        <!-- Search button removed: now only accessible via sidebar menu-az button -->
+        <div class="news-cards" id="news-cards">
+            <!-- Cards will be rendered dynamically using card.html template -->
+        </div>
+    </div>
+    <!-- Search button styles removed -->
+    <script>
+        // If search_params are present, trigger search via SocketIO and prevent new users fetch
+        let didSearch = false;
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = {{ search_params|tojson }};
+            if (params && (params.city || params.name || params.age_min || params.age_max || params.country)) {
+                // Clear cards
+                cardsContainer.innerHTML = '';
+                for (const key in cardsMap) delete cardsMap[key];
+                socket.emit('get_search_users', params);
+                didSearch = true;
+            }
+        });
+        // Log when the script is loaded
+        console.log('[LOG] Script loaded: start');
+
+        // Function to toggle the sidebar open/close
+        function toggleSidebar() {
+            console.log('[LOG] toggleSidebar called');
+            var sidebarElement = document.getElementById('sidebar');
+            if (sidebarElement) {
+                console.log('[LOG] Sidebar found:', sidebarElement);
+                var wasOpen = sidebarElement.classList.contains('open');
+                sidebarElement.classList.toggle('open');
+                console.log('[LOG] Sidebar open before:', wasOpen, 'after:', sidebarElement.classList.contains('open'));
+            } else {
+                console.log('[LOG] Sidebar NOT found');
+            }
+        }
+
+        // Log DOMContentLoaded and print all news cards found at load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[LOG] DOM fully loaded');
+            var cardElements = document.querySelectorAll('.news-card');
+            console.log('[LOG] Number of news-cards:', cardElements.length);
+            cardElements.forEach(function(cardElement, idx) {
+                var usernameElement = cardElement.querySelector('.news-card-username');
+                var locationElement = cardElement.querySelector('.news-card-location');
+                var imgElement = cardElement.querySelector('img');
+                console.log('[LOG] Card', idx+1, {
+                    username: usernameElement ? usernameElement.textContent : null,
+                    location: locationElement ? locationElement.textContent : null,
+                    photo: imgElement ? imgElement.src : null
+                });
+            });
+        });
+
+        // SocketIO for dynamically loading cards
+        const socket = io();
+        const cardsContainer = document.getElementById('news-cards');
+        let cardsMap = {};
+
+
+        // Function to request a new photo for the card (now global)
+        function changeCardPhoto(cardId, direction) {
+            console.log('[LOG] changeCardPhoto called for card:', cardId, 'direction:', direction);
+            fetch(`/change_photo/${cardId}/${direction}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.photo) {
+                        const cardDiv = document.getElementById('card-' + cardId);
+                        const imgDiv = cardDiv.querySelector('.news-card-img');
+                        imgDiv.querySelector('img').src = data.photo;
+                    }
+                })
+                .catch(err => console.error('[LOG] Error updating photo:', err));
+        }
+
+        // Render a new card using the card.html template via AJAX
+        function renderCard(card) {
+            console.log('[LOG] Rendering new card:', card);
+            fetch(`/render_card/${card.id}`)
+                .then(response => response.text())
+                .then(html => {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    const cardDiv = tempDiv.firstElementChild;
+                    cardsContainer.appendChild(cardDiv);
+                    cardsMap[card.id] = cardDiv;
+                });
+        }
+
+        // Update an existing card's photo and age
+        function updateCard(card) {
+            console.log('[LOG] Updating card:', card);
+            const div = cardsMap[card.id];
+            if (!div) {
+                console.log('[LOG] Card not found for update:', card.id);
+                return;
+            }
+            if (card.photo) {
+                const img = div.querySelector('.news-card-img img');
+                if (img) img.src = card.photo;
+            }
+            if (card.age) {
+                let ageDiv = div.querySelector('.news-card-age');
+                if (!ageDiv) {
+                    const infoDiv = div.querySelector('.news-card-info');
+                    ageDiv = document.createElement('div');
+                    ageDiv.className = 'news-card-age';
+                    infoDiv.appendChild(ageDiv);
+                }
+                ageDiv.textContent = `Age: ${card.age}`;
+            }
+        }
+
+        // On socket connection, request cards from server (only if not searching)
+        socket.on('connect', () => {
+            if (!didSearch) {
+                console.log('[LOG] Socket connected, emitting get_new_users');
+                socket.emit('get_new_users');
+            } else {
+                console.log('[LOG] Socket connected, search mode active, not emitting get_new_users');
+            }
+        });
+
+        // On receiving a new card, render it
+        socket.on('new_card', (card) => {
+            console.log('[LOG] Received new_card:', card);
+            renderCard(card);
+        });
+
+        // On receiving an update for a card, update it
+        socket.on('update_card', (card) => {
+            console.log('[LOG] Received update_card:', card);
+            updateCard(card);
+        });
+    </script>
+</body>
+</html>

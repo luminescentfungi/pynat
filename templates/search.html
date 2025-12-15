@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Buscar Miembros</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .search-container {
+            max-width: 400px;
+            margin: 60px auto 0 auto;
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 4px 32px rgba(157, 144, 199, 0.18);
+            padding: 32px 28px 28px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+        .search-label {
+            font-weight: bold;
+            color: #7a6c8a;
+            margin-bottom: 6px;
+        }
+        .search-input, .search-select {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #d1cbe6;
+            font-size: 1em;
+            margin-bottom: 8px;
+        }
+        .search-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .search-btn {
+            margin: 0 auto;
+            background: #b476b6;
+            color: #fff;
+            border: none;
+            border-radius: 24px;
+            padding: 12px 36px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(157, 144, 199, 0.12);
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .search-btn:hover {
+            background: #9d90c7;
+        }
+        @media (max-width: 600px) {
+            .search-container {
+                max-width: 98vw;
+                margin: 16vw 1vw 0 1vw;
+                padding: 18px 8px 18px 8px;
+                box-shadow: 0 2px 12px rgba(157, 144, 199, 0.12);
+            }
+            .search-btn {
+                width: 100%;
+                padding: 12px 0;
+                font-size: 1em;
+            }
+            .header {
+                padding: 8px 8px;
+            }
+            .logo img {
+                max-width: 120px;
+                height: auto;
+            }
+            .search-input, .search-select {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="hamburger" onclick="toggleSidebar()">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+        <div class="logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        </div>
+    </div>
+    {% include 'sidebar.html' %}
+    <div class="content">
+        <div class="search-container">
+            <div>
+                <div class="search-label">Nombre</div>
+                <input class="search-input" type="text" name="nombre" placeholder="Nombre...">
+            </div>
+            <div>
+                <div class="search-label">Rango de edad</div>
+                <div class="search-row">
+                    <input class="search-input" type="number" name="edad_desde" min="18" max="99" placeholder="Desde">
+                    <span style="color:#b476b6;font-weight:bold;">-</span>
+                    <input class="search-input" type="number" name="edad_hasta" min="18" max="99" placeholder="Hasta">
+                </div>
+            </div>
+            <div>
+                <div class="search-label">Ciudad</div>
+                <input class="search-input" type="text" name="ciudad" placeholder="Ciudad...">
+            </div>
+            <div>
+                <div class="search-label">País</div>
+                <input class="search-input" type="text" name="pais" placeholder="País...">
+            </div>
+            <button class="search-btn" type="button">Buscar</button>
+        </div>
+    </div>
+    <script>
+        function toggleSidebar() {
+            var sidebarElement = document.getElementById('sidebar');
+            if (sidebarElement) {
+                sidebarElement.classList.toggle('open');
+            }
+        }
+        document.querySelector('.search-btn').addEventListener('click', function() {
+            const nombre = document.querySelector('input[name="nombre"]').value;
+            const edad_desde = document.querySelector('input[name="edad_desde"]').value;
+            const edad_hasta = document.querySelector('input[name="edad_hasta"]').value;
+            const ciudad = document.querySelector('input[name="ciudad"]').value;
+            const pais = document.querySelector('input[name="pais"]').value;
+            const params = new URLSearchParams({
+                name: nombre,
+                age_min: edad_desde,
+                age_max: edad_hasta,
+                city: ciudad,
+                country: pais
+            });
+            window.location.href = '/?'+params.toString();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!-- sidebar.html: menú lateral para la app móvil -->
+<div id="sidebar" class="sidebar">
+    <div class="hamburger" id="closeSidebar" onclick="document.getElementById('sidebar').classList.remove('open')">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+    </div>
+    <a class="menu-btn" id="menu-az" href="/search">
+        <img src="{{ url_for('static', filename='menu_images/az.png') }}" alt="az">
+    </a>
+    <button class="menu-btn" id="menu-events">
+        <img src="{{ url_for('static', filename='menu_images/events.png') }}" alt="events">
+    </button>
+    <button class="menu-btn" id="menu-msgs">
+        <img src="{{ url_for('static', filename='menu_images/msgs.png') }}" alt="msgs">
+    </button>
+    <button class="menu-btn" id="menu-natstay">
+        <img src="{{ url_for('static', filename='menu_images/natstay.png') }}" alt="natstay">
+    </button>
+    <button class="menu-btn" id="menu-new">
+        <img src="{{ url_for('static', filename='menu_images/new.png') }}" alt="new">
+    </button>
+    <button class="menu-btn" id="menu-photos"></button>
+        <img src="{{ url_for('static', filename='menu_images/photos.png') }}" alt="photos">
+    </button>
+</div>
