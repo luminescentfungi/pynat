@@ -1,31 +1,37 @@
-<!-- card.html: Template for a single news card, with JS logic for arrows included -->
-<div class="news-card-wrapper">
-    <div class="arrow-box arrow-box-left">
-        <span class="arrow arrow-left" onclick="changeCardPhoto('{{ card.id }}', 'left')">&#8592;</span>
+<!-- card.html: Template for a single news card with buttons below info -->
+<div class="card" id="card-{{ card.id }}" style="width: 100%; margin-bottom: 50px;">
+  <div class="card-img">
+    {% if card.photo %}
+    <img src="{{ card.photo }}" alt="Photo of {{ card.username }}">
+    {% else %}
+    <div class="no-photo">No photo</div>
+    {% endif %}
+  </div>
+  <div class="card-info">
+    <div class="card-username">{{ card.username or 'undefined' }}</div>
+    <div class="card-location">{{ card.location or 'undefined' }}</div>
+    {% if card.age %}
+    <div class="card-age">Age: {{ card.age }}</div>
+    {% endif %}
+  </div>
+    <div class="card-actions" style="display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 32px; margin-top: 18px;">
+        <span class="arrow arrow-left" onclick="changeCardPhoto('{{ card.id }}', 'left')" style="display: inline-block; font-size: 2rem; cursor: pointer; user-select: none; color: inherit;">&#8592;</span>
+        <button type="button" onclick="openConversation('{{ card.id }}')" class="message-btn" title="Send message" style="display: inline-block; background: none; border: none; font-size: 2rem; cursor: pointer; color: inherit; padding: 0;">
+            &#128233;
+        </button>
+        <span class="arrow arrow-right" onclick="changeCardPhoto('{{ card.id }}', 'right')" style="display: inline-block; font-size: 2rem; cursor: pointer; user-select: none; color: inherit;">&#8594;</span>
     </div>
-    <div class="news-card" id="card-{{ card.id }}">
-        <div class="news-card-img">
-            {% if card.photo %}
-                <img src="{{ card.photo }}" alt="Photo of {{ card.username }}">
-            {% else %}
-                <div class="no-photo">No photo</div>
-            {% endif %}
-        </div>
-        <div class="news-card-info">
-            <div class="news-card-username">{{ card.username or 'undefined' }}</div>
-            <div class="news-card-location">{{ card.location or 'undefined' }}</div>
-            {% if card.age %}
-                <div class="news-card-age">Age: {{ card.age }}</div>
-            {% endif %}
-        </div>
-    </div>
-    <div class="arrow-box arrow-box-right" style="display: flex; flex-direction: column; align-items: center;">
-        <span class="arrow arrow-right" onclick="changeCardPhoto('{{ card.id }}', 'right')">&#8594;</span>
-        <div class="message-box" style="margin-top: 32px;">
-            <a href="{{ MSG_TO_URL }}{{ card.id }}" target="_blank" class="message-btn" title="Send message" style="font-size: 2rem; text-decoration: none;">
-                &#128233;
-            </a>
-        </div>
-    </div>
-</div>
-
+<script>
+function openConversation(cardId) {
+    fetch(`/open_conversation/${cardId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.url) {
+                window.open(data.url, '_blank');
+            } else {
+                alert('No se pudo abrir la conversacion.');
+            }
+        })
+        .catch(() => alert('No se pudo abrir la conversacion.'));
+}
+</script>

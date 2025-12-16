@@ -59,11 +59,11 @@
         // Log DOMContentLoaded and print all news cards found at load
         document.addEventListener('DOMContentLoaded', function() {
             console.log('[LOG] DOM fully loaded');
-            var cardElements = document.querySelectorAll('.news-card');
+            var cardElements = document.querySelectorAll('.card');
             console.log('[LOG] Number of news-cards:', cardElements.length);
             cardElements.forEach(function(cardElement, idx) {
-                var usernameElement = cardElement.querySelector('.news-card-username');
-                var locationElement = cardElement.querySelector('.news-card-location');
+                var usernameElement = cardElement.querySelector('.card-username');
+                var locationElement = cardElement.querySelector('.card-location');
                 var imgElement = cardElement.querySelector('img');
                 console.log('[LOG] Card', idx+1, {
                     username: usernameElement ? usernameElement.textContent : null,
@@ -87,7 +87,7 @@
                 .then(data => {
                     if (data.photo) {
                         const cardDiv = document.getElementById('card-' + cardId);
-                        const imgDiv = cardDiv.querySelector('.news-card-img');
+                        const imgDiv = cardDiv.querySelector('.card-img');
                         imgDiv.querySelector('img').src = data.photo;
                     }
                 })
@@ -117,19 +117,24 @@
                 return;
             }
             if (card.photo) {
-                const img = div.querySelector('.news-card-img img');
+                const img = div.querySelector('.card-img img');
                 if (img) img.src = card.photo;
             }
             if (card.age) {
-                let ageDiv = div.querySelector('.news-card-age');
+                let ageDiv = div.querySelector('.card-age');
                 if (!ageDiv) {
-                    const infoDiv = div.querySelector('.news-card-info');
+                    const infoDiv = div.querySelector('.card-info');
                     ageDiv = document.createElement('div');
-                    ageDiv.className = 'news-card-age';
+                    ageDiv.className = 'card-age';
                     infoDiv.appendChild(ageDiv);
                 }
                 ageDiv.textContent = `Age: ${card.age}`;
             }
+        }
+
+        // Make openConversation globally available for card.html
+        function openConversation(cardId) {
+            window.location.href = `/open_conversation/${cardId}`;
         }
 
         // On socket connection, request cards from server (only if not searching)

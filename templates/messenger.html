@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat con {{ contact_name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        /* Estilos de search.html adaptados */
+        body {
+            background-color: #f7f5fa; /* Fondo suave */
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .content {
+            flex-grow: 1;
+            padding-top: 50px; /* Para dejar espacio al header */
+            padding-bottom: 100px; /* Para dejar espacio al input de chat */
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0; 
+            height: 50px;
+            background: #b476b6; /* Color principal de search.html */
+            color: #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .header-title {
+            flex-grow: 1;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-right: 40px; /* Offset para el botón de hamburguesa */
+        }
+        /* Fin de estilos de search.html adaptados */
+
+        /* Estilos específicos de mensajería */
+        .chat-area {
+            flex-grow: 1;
+            padding: 20px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message-row {
+            display: flex;
+            width: 100%;
+        }
+        .message-row.left {
+            justify-content: flex-start;
+        }
+        .message-row.right {
+            justify-content: flex-end;
+            /* Ensure full right alignment */
+            align-items: flex-end;
+        }
+        .message-bubble {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 20px;
+            position: relative;
+            word-wrap: break-word;
+            line-height: 1.4;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        /* Burbuja recibida (izquierda) */
+        .msg-received {
+            background-color: #ffffff; /* Blanco o muy claro */
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+        /* Burbuja enviada (derecha) */
+        .msg-sent {
+            background-color: #9d90c7; /* Color de hover de search.html */
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .message-time {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.75em;
+            text-align: right;
+            opacity: 0.7;
+        }
+        
+        /* Contenedor de entrada de chat (siempre abajo) */
+        .chat-input-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            padding: 10px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            z-index: 1000;
+        }
+        .chat-input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border-radius: 24px;
+            border: 1px solid #d1cbe6;
+            margin-right: 10px;
+            font-size: 1em;
+            resize: none; /* Evita que se cambie el tamaño en móvil */
+            min-height: 48px;
+            box-sizing: border-box;
+        }
+        .send-btn {
+            background: #b476b6;
+            color: #fff;
+            border: none;
+            border-radius: 50%; /* Botón redondo */
+            width: 48px;
+            height: 48px;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(157, 144, 199, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .send-btn:hover {
+            background: #9d90c7;
+        }
+
+        /* MEDIA QUERIES para responsividad */
+        @media (max-width: 600px) {
+            .header-title {
+                font-size: 1em;
+            }
+            .chat-area {
+                padding: 15px 5px;
+            }
+            .chat-input-container {
+                padding: 8px 5px;
+            }
+            .chat-input {
+                margin-right: 5px;
+            }
+            .send-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 1.2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="hamburger" onclick="toggleSidebar()">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+        <div class="header-title">
+            {{ contact_name }}
+        </div>
+        <a href="#" style="color:white; font-size: 1.5em; text-decoration: none; margin-left: auto;">&#x2026;</a> </div>
+
+    {% include 'sidebar.html' %} <div class="content">
+        <div style="text-align:center; color: #7a6c8a; font-size: 0.9em; margin-top: 10px;">
+            Conversación sobre: {{ subject }}
+        </div>
+        
+        <div class="chat-area">
+            {{ messages_html | safe }}
+        </div>
+    </div>
+
+    <div class="chat-input-container">
+        <textarea id="chatInput" class="chat-input" placeholder="Write a message..." rows="1"></textarea>
+        <button class="send-btn" onclick="sendMessage()">&#10148;</button>
+    </div>
+
+    <script>
+        // Función de JS copiada de search.html
+        function toggleSidebar() {
+            var sidebarElement = document.getElementById('sidebar');
+            if (sidebarElement) {
+                sidebarElement.classList.toggle('open');
+            }
+        }
+
+        // Función para enviar mensaje usando la API backend
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            const subject = "{{ subject|e }}";
+            const key_message = "{{ key_message|e }}";
+            const key_conversation = "{{ key_conversation|e }}"; // Add this if available
+            if (message) {
+                fetch(`/send_message/{{ contact_id }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message, subject: subject, key_message: key_message, key_conversation: key_conversation })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const chatArea = document.querySelector('.chat-area');
+                        const newMessage = document.createElement('div');
+                        newMessage.className = 'message-row right';
+                        newMessage.innerHTML = `
+                            <div class="message-bubble msg-sent">
+                                <div class="message-text">${message}</div>
+                                <div class="message-time">A few seconds ago</div>
+                            </div>
+                        `;
+                        chatArea.appendChild(newMessage);
+                        input.value = '';
+                        chatArea.scrollTop = chatArea.scrollHeight;
+                    } else {
+                        alert('No se pudo enviar el mensaje.');
+                    }
+                })
+                .catch(() => alert('No se pudo enviar el mensaje.'));
+            }
+        }
+
+        // Auto-resize del textarea y scroll al final
+        document.addEventListener('DOMContentLoaded', () => {
+             const chatArea = document.querySelector('.chat-area');
+             chatArea.scrollTop = chatArea.scrollHeight; // Scroll al cargar
+
+             const textarea = document.getElementById('chatInput');
+             textarea.addEventListener('input', function() {
+                 this.style.height = 'auto';
+                 this.style.height = (this.scrollHeight) + 'px';
+             });
+        });
+
+    </script>
+</body>
+</html>

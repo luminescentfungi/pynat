@@ -1,5 +1,5 @@
 # Import necessary libraries
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 import httpx, re
 from bs4 import BeautifulSoup
@@ -49,7 +49,7 @@ def render_card(member_id):
             'age': '',
             'photoIndex': 0
         }
-    return render_template("card.html", card=card, MSG_TO_URL=MSG_TO_URL)
+    return render_template("card.html", card=card)
 
 # Endpoint to change the card photo (left/right)
 @app.route("/change_photo/<member_id>/<direction>")
@@ -68,19 +68,11 @@ def change_photo(member_id, direction):
         photoIndex += 1
     card['photoIndex'] = photoIndex
     
-    soup_partial, _ = get_member_soup_and_text(member_id)
-    if soup_partial:
-            thumbnails = soup_partial.find_all('a', class_='Thumbnail')
-            if thumbnails:
-                try:
-                    img = thumbnails[photoIndex].find('img')
-                except IndexError:
-                    img = thumbnails[0].find('img')
-                    card['photoIndex'] = 0
-                if img and img.get('src'):
-                    img_path = img['src'].replace("_t", "_l")
-                    photo = f"/proxy_image/{img_path}"
-                    log_message(f"Found photo: {photo}", "LOG")
+    photos = card.get('photos', [])
+    if not 0 <= photoIndex < len(photos):
+        photoIndex = 0  # Reset to first photo if out of bounds
+        card['photoIndex'] = photoIndex
+    photo = photos[photoIndex]
     return {"photo": photo}
 
 # Route to proxy images from the external site
@@ -104,6 +96,86 @@ def search():
     return render_template("search.html")
 
 
+# Endpoint to open a message
+@app.route("/open_conversation/<member_id>")
+def open_conversation(member_id):
+    log_message(f"Opening conversation for member_id: {member_id}", "LOG")
+    # First obtain soup and text to verify member exists
+    soup_partial, text = get_member_soup_and_text(member_id)
+    if not text:
+        log_message(f"Member {member_id} not found", "ERR")
+        return "Member not found", 404
+    pattern = re.compile(
+        r"KeyConversation=(\d+)"
+    )
+    match = pattern.search(str(soup_partial))
+    if match:
+        key_conversation = match.group(1)
+        log_message(f"Found conversation: KeyConversation={key_conversation}", "LOG")
+        url = f"{CONVERSATION_URL}{key_conversation}"
+        log_message("Opening conversation URL:", url)
+
+        with httpx.Client(timeout=10) as client:
+            response = client.get(url, headers=HEADERS)
+        html_content = response.text
+        conversation_data = parse_conversation(html_content)
+
+        # Extract the value of formMsg_New_KeyMessage from the HTML
+        formMsg_New_KeyMessage = None
+        input_elem = BeautifulSoup(html_content, "html.parser").find("input", {"name": "formMsg_New_KeyMessage"})
+        if input_elem and input_elem.has_attr("value"):
+            formMsg_New_KeyMessage = input_elem["value"]
+        log_message(f"Key formMsg_New_KeyMessage: {formMsg_New_KeyMessage}", "DEB")
+
+        # Extract the value of formMsg_New_Subject from the HTML
+        formMsg_New_Subject = None
+        input_elem_subject = BeautifulSoup(html_content, "html.parser").find("input", {"name": "formMsg_New_Subject"})
+        if input_elem_subject and input_elem_subject.has_attr("value"):
+            formMsg_New_Subject = input_elem_subject["value"]
+        log_message(f"Key formMsg_New_Subject: {formMsg_New_Subject}", "DEB")
+        
+        log_message(f"Parsed conversation data for member {member_id}", "LOG")
+        
+        # Preparamos los mensajes para inyectar en el nuevo HTML
+        messages_html_list = []
+        for msg in conversation_data['messages']:
+            # Creamos la estructura del mensaje para el nuevo template
+            css_class = 'msg-sent' if msg['alignment'] == 'right' else 'msg-received'
+            messages_html_list.append(f"""
+                <div class="message-row {msg['alignment']}">
+                    <div class="message-bubble {css_class}">
+                        <div class="message-text">{msg['body']}</div>
+                        <div class="message-time">{msg['time']}</div>
+                    </div>
+                </div>
+            """)
+        messages_html = "\n".join(messages_html_list)
+        log_message(f"Rendering messenger template for member {member_id}", "DEB")
+        log_message(f"Contact id: {member_id}, Contact name: {conversation_data['contact']}, Subject: {conversation_data['subject']}", "DEB")
+        return render_template(
+            'messenger.html',
+            contact_id = member_id,
+            contact_name=conversation_data['contact'],
+            key_message=formMsg_New_KeyMessage,
+            subject=formMsg_New_Subject,
+            messages_html=messages_html
+        )
+    else:
+        if soup_partial:
+            username_container =soup_partial.find('div', id='divMemberTitle')
+            if username_container:
+                if '.' in username_container.get_text(strip=True):
+                    username = username_container.get_text(strip=True).split('.')[-1]
+                else:
+                    username = username_container.get_text(strip=True)
+        return render_template(
+            'messenger.html',
+            contact_id = member_id,
+            contact_name=username if username else "Unknown",
+            subject="Unknown",
+            messages_html=""
+        )
+
 # SocketIO event to handle search and streaming of cards
 @socketio.on('get_search_users')
 def handle_get_search_users(data):
@@ -118,7 +190,10 @@ def handle_get_search_users(data):
     ids = get_ids_from_city(city)
 
     member_ids = []
+    count = 0
     for member_id in ids:
+        if count >= MAX_RESULTS:
+            break
         soup_partial, text = get_member_soup_and_text(member_id)
         username = None
         location = None
@@ -163,6 +238,7 @@ def handle_get_search_users(data):
         if member_id and member_id not in member_ids:
             member_ids.append(member_id)
             emit('new_card', card)
+            count += 1
         emit('update_card', {
             'id': member_id,
             'age': age,
@@ -183,11 +259,15 @@ def handle_get_new_users():
     news_blocks = soup.find_all(class_='News')
     member_ids = []
     log_message(f"Found {len(news_blocks)} news blocks", "LOG")
-    for idx, news_block in enumerate(news_blocks[:10]):
+    count = 0
+    for idx, news_block in enumerate(news_blocks):
+        if count >= MAX_RESULTS:
+            break
         log_message(f"Processing news block {idx+1}", "LOG")
         onclick_attr = news_block.get('onclick', '')
         match = re.search(r'MemberShow\((\d+),', onclick_attr)
         member_id = None
+        photos = []
         if match:
             member_id = match.group(1)
             log_message(f"Found member_id: {member_id}", "LOG")
@@ -216,19 +296,21 @@ def handle_get_new_users():
                 age = match_age.group(2)
                 log_message(f"Found age: {age}", "LOG")
         if soup_partial:
-            thumbnail = soup_partial.find('a', class_='Thumbnail')
-            if thumbnail:
-                img = thumbnail.find('img')
-                if img and img.get('src'):
-                    img_path = img['src'].replace("_t", "_l")
-                    photo = f"/proxy_image/{img_path}"
-                    log_message(f"Found photo: {photo}", "LOG")
+            thumbnails = soup_partial.find_all('a', class_='Thumbnail')
+            if thumbnails:
+                imgs = [t.find('img') for t in thumbnails]
+                for img in imgs:
+                    if img and img.get('src'):
+                        img_path = img['src'].replace("_t", "_l")
+                        photos.append(f"/proxy_image/{img_path}")
+                log_message(f"Found {len(photos)} photos", "LOG")
         # Store card data for rendering
         card = {
             'id': member_id,
             'username': username or 'undefined',
             'location': location or 'undefined',
-            'photo': photo or '',
+            'photos': photos,
+            'photo': photos[0] if photos else '',
             'age': age or '',
             'photoIndex': 0
         }
@@ -237,6 +319,7 @@ def handle_get_new_users():
             member_ids.append(member_id)
             log_message(f"Emitting new_card: {card}", "LOG")
             emit('new_card', card)
+            count += 1
         # Emit card update with age and photo
         log_message(f"Emitting update_card for id {member_id} with age: {age}, photo: {photo}", "LOG")
         emit('update_card', {
@@ -244,6 +327,26 @@ def handle_get_new_users():
             'age': age,
             'photo': photo
         })
+
+# Endpoint to send a message to a contact
+@app.route("/send_message/<contact_id>", methods=["POST"])
+def send_message_route(contact_id):
+    data = request.get_json()
+    log_message(f"[DEBUG] Incoming POST /send_message/{contact_id} data: {data}", "DEB")
+    message = data.get("message")
+    subject = data.get("subject", "")
+    key_message = data.get("key_message", "0")
+    key_conversation = data.get("key_conversation")  # <-- Add this
+    log_message(f"Sending message to contact {contact_id} with subject '{subject}' and key_message '{key_message}'", "LOG")
+    if not message:
+        return jsonify(success=False, error="No message provided"), 400
+    try:
+        resp = send_message(contact_id, message, key_message, subject, key_conversation)
+        log_message(f"[DEBUG] Response from send_message: {getattr(resp, 'status_code', None)} {getattr(resp, 'text', None)}", "DEB")
+        return jsonify(success=True)
+    except Exception as e:
+        log_message(f"Error sending message: {e}", "ERR")
+        return jsonify(success=False, error=str(e)), 500
 
 # Main entry point
 if __name__ == "__main__":
